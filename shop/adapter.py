@@ -1,29 +1,22 @@
-
-"""Implement the Adapter(s) so our app can speak to 3rd-party SDKs.
-
-Goal: Make StripeAPI and PayPalClient usable via the PaymentProcessor interface without
-changing the app code in app.checkout.
-"""
-from .payments import PaymentProcessor
-from .third_party_providers import StripeAPI, PayPalClient
+from shop.payments import PaymentProcessor
+from shop.third_party_providers import StripeAPI, PayPalClient
 
 class StripeAdapter(PaymentProcessor):
-    """Adapt StripeAPI(charge amount_cents) -> dict to PaymentProcessor(pay amount_eur) -> str."""
     def __init__(self, client: StripeAPI):
         self.client = client
 
     def pay(self, amount: float) -> str:
-        # TODO:
-        raise NotImplementedError
+        cents = int(round(amount * 100))
+        payload = self.client.charge(cents)
+        merchant_id = payload.get("merchant_id", "unknown")
+        return f"paid {amount:.2f} EUR via Stripe ({merchant_id})"
 
 class PayPalAdapter(PaymentProcessor):
-    """Adapt PayPalClient(make_payment total: float) -> (bool, total) to PaymentProcessor interface."""
     def __init__(self, client: PayPalClient):
         self.client = client
 
     def pay(self, amount: float) -> str:
-        # TODO:
-        # - Call self.client.make_payment(amount)
-        # - Validate the success flag
-        # - Return: "paid 12.34 EUR via PayPal (merchant@example.com)"
-        raise NotImplementedError
+        ok, total = self.client.make_payment(amount)
+        if not ok:
+            raise RuntimeError("PayPal payment failed")
+        return f"paid {total:.2f} EUR via PayPal ({self.client.account_email})"
